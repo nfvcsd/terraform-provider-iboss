@@ -1,0 +1,209 @@
+package provider_test
+
+import (
+	"regexp"
+	"testing"
+
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	"github.com/nfvcsd/iboss-terraform/internal/client"
+	"github.com/nfvcsd/iboss-terraform/internal/provider"
+	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+)
+
+func TestAccDataSources(t *testing.T) {
+	sim := newAcc(t)
+	sim.SetEntries(client.Allowlist, 2,
+		map[string]any{"url": "google.com", "weight": 501, "applyKeywordAndSafeSearch": 1},
+		map[string]any{"url": "dropbox.com/", "doDlpScan": 0},
+	)
+	sim.SetEntries(client.Blocklist, 2, map[string]any{"url": "weather.com/", "isTimedUrl": 1, "timedUrlExpiresInMinutes": 15})
+	sim.SetAllowlistSettings(2, map[string]any{"onlyAllowWhiteList": 1, "displayAllowedSitesPage": 0, "defaultTimedUrlTimeout": 0, "groupInheritanceGroupNumber": 1, "groupInheritancePolicy": 0, "message": ""})
+
+	cfg := providerAPIKey + `
+data "iboss_security_group" "students" {
+  name = "Students"
+}
+data "iboss_allowlist" "students" {
+  group_number = data.iboss_security_group.students.group_number
+}
+data "iboss_blocklist" "students" {
+  group_number = data.iboss_security_group.students.group_number
+}
+data "iboss_allowlist_settings" "students" {
+  group_number = data.iboss_security_group.students.group_number
+}
+data "iboss_blocklist" "empty" {
+  group_number = 9
+}
+`
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config: cfg,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.iboss_security_group.students", "group_number", "2"),
+				resource.TestCheckResourceAttr("data.iboss_security_group.students", "reserved", "false"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.#", "2"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.0.url", "google.com"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.0.weight", "501"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.0.apply_keyword_and_safe_search", "true"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.1.url", "dropbox.com/"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist.students", "entries.1.do_dlp_scan", "false"),
+				resource.TestCheckResourceAttr("data.iboss_blocklist.students", "entries.#", "1"),
+				resource.TestCheckResourceAttr("data.iboss_blocklist.students", "entries.0.is_timed_url", "true"),
+				resource.TestCheckResourceAttr("data.iboss_blocklist.students", "entries.0.timed_url_expires_in_minutes", "15"),
+				resource.TestCheckResourceAttr("data.iboss_blocklist.students", "entries.0.type", "1"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist_settings.students", "only_allow_allowlist", "true"),
+				resource.TestCheckResourceAttr("data.iboss_allowlist_settings.students", "group_inheritance_group_number", "1"),
+				resource.TestCheckResourceAttr("data.iboss_blocklist.empty", "entries.#", "0"),
+			),
+		}},
+	})
+}
+
+func TestAccSecurityGroupLookup(t *testing.T) {
+	sim := newAcc(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{
+			{
+				Config: providerAPIKey + `data "iboss_security_group" "g" { group_number = 3 }`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.iboss_security_group.g", "name", "Staff"),
+					resource.TestCheckResourceAttr("data.iboss_security_group.g", "reserved", "true"),
+					resource.TestCheckResourceAttr("data.iboss_security_group.g", "id", "3"),
+				),
+			},
+			{
+				Config:      providerAPIKey + `data "iboss_security_group" "g" { name = "students" }`,
+				ExpectError: regexp.MustCompile(`Security group not found`),
+			},
+			{
+				Config:      providerAPIKey + `data "iboss_security_group" "g" {}`,
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				Config: providerAPIKey + `data "iboss_security_group" "g" {
+  name         = "Staff"
+  group_number = 3
+}`,
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				// End on a valid configuration so the post-test destroy can run.
+				Config: providerAPIKey + `data "iboss_security_group" "g" { name = "Default" }`,
+				Check:  resource.TestCheckResourceAttr("data.iboss_security_group.g", "group_number", "1"),
+			},
+		},
+	})
+}
+
+func TestAccSecurityGroupDuplicateNames(t *testing.T) {
+	sim := newAcc(t)
+	sim.Groups = append(sim.Groups, map[string]any{"groupNumber": 8, "groupName": "Staff", "reservedGroup": 0})
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config:      providerAPIKey + `data "iboss_security_group" "g" { name = "Staff" }`,
+			ExpectError: regexp.MustCompile(`Multiple security groups found`),
+		}},
+	})
+}
+
+const dsOnly = `
+data "iboss_security_group" "g" {
+  group_number = 1
+}
+`
+
+func TestAccProvider_envFallback(t *testing.T) {
+	sim := newAcc(t)
+	t.Setenv(provider.EnvAPIKey, testutil.SimAPIKey)
+	t.Setenv(provider.EnvAccountSettingsID, "100001")
+	t.Setenv(provider.EnvGatewayHost, testutil.GatewayHost)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config: `provider "iboss" {}` + dsOnly + `
+data "iboss_blocklist" "b" {
+  group_number = 1
+}`,
+			Check: resource.TestCheckResourceAttr("data.iboss_security_group.g", "name", "Default"),
+		}},
+	})
+	if sim.CountRequests("GET", "/ibcloud/web/account/clusters") != 0 {
+		t.Error("IBOSS_GATEWAY_HOST should skip discovery")
+	}
+}
+
+func TestAccProvider_configCredentialsIgnoreEnv(t *testing.T) {
+	sim := newAcc(t)
+	t.Setenv(provider.EnvUsername, "someone-else")
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps:                    []resource.TestStep{{Config: providerAPIKey + dsOnly}},
+	})
+}
+
+func TestAccProvider_legacyLogin(t *testing.T) {
+	sim := newAcc(t)
+	sim.APIKey = "" // accept only the issued legacy token
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config: `
+provider "iboss" {
+  username = "` + testutil.SimUsername + `"
+  password = "` + testutil.SimPassword + `"
+}` + dsOnly,
+			Check: resource.TestCheckResourceAttr("data.iboss_security_group.g", "name", "Default"),
+		}},
+	})
+}
+
+func TestAccProvider_configurationErrors(t *testing.T) {
+	sim := newAcc(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "iboss" {
+  api_key  = "k"
+  username = "u"
+  password = "p"
+}` + dsOnly,
+				ExpectError: regexp.MustCompile(`conflicting credentials`),
+			},
+			{
+				Config:      `provider "iboss" {}` + dsOnly,
+				ExpectError: regexp.MustCompile(`no credentials`),
+			},
+			{
+				Config:      `provider "iboss" { username = "u" }` + dsOnly,
+				ExpectError: regexp.MustCompile(`incomplete legacy credentials`),
+			},
+			{
+				Config:      `provider "iboss" { api_key = "sim-wrong-key-1234" }` + dsOnly,
+				ExpectError: regexp.MustCompile(`HTTP 401`),
+			},
+			{
+				Config:      `provider "iboss" { account_settings_id = 0 }` + dsOnly,
+				ExpectError: regexp.MustCompile(`must be at least 1`),
+			},
+		},
+	})
+}
+
+func TestAccProvider_invalidEnvAccount(t *testing.T) {
+	sim := newAcc(t)
+	t.Setenv(provider.EnvAccountSettingsID, "abc")
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config:      providerAPIKey + dsOnly,
+			ExpectError: regexp.MustCompile(`IBOSS_ACCOUNT_SETTINGS_ID must be a positive integer`),
+		}},
+	})
+}
