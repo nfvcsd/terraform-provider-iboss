@@ -35,3 +35,12 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Provider build and tooling output
+bin/
+dist/
+build/
+terraform-provider-iboss
+*.test
+__pycache__/
+*.pyc

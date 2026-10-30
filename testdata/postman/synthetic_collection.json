@@ -1,0 +1,61 @@
+{
+  "info": {
+    "_postman_id": "00000000-0000-0000-0000-00000000abcd",
+    "name": "Synthetic iboss API fixture",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "id": "00000000-0000-0000-0000-000000000001",
+          "name": "Get Primary Account ID",
+          "request": {
+            "method": "GET",
+            "urlObject": {"protocol": "https", "host": ["{{baseApiDomain}}"], "path": ["ibcloud", "web", "users", "mySettings"], "query": []}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway",
+      "item": [
+        {
+          "name": "Allowlist",
+          "item": [
+            {
+              "name": "V3",
+              "item": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000003",
+                  "name": "Replace Allow List V3",
+                  "request": {
+                    "method": "PUT",
+                    "urlObject": {"host": ["{{gatewayNodeApiDomain}}"], "path": ["json", "v3", "controls", "allowList", "replace"], "query": []}
+                  }
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000002",
+              "name": "Get | Allow List",
+              "request": {
+                "method": "GET",
+                "urlObject": {"host": ["{{gatewayNodeApiDomain}}"], "path": ["json", "controls", "allowList"], "query": [{"key": "currentPolicyBeingEdited", "value": "1"}]}
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "name": "Login (string URL form)",
+      "request": {
+        "method": "GET",
+        "url": "https://{{ibossAccounts}}/ibossauth/web/tokens?ignoreAuthModule=true&totpCode={{auth_mfa}}"
+      }
+    }
+  ]
+}
