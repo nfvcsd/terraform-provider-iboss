@@ -1,0 +1,73 @@
+# Pull-request checks. No iboss credentials are available or needed here:
+# acceptance tests run against the in-process simulator only.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TERRAFORM_VERSION: "1.16.6"
+  CHECKPOINT_DISABLE: "1"
+
+jobs:
+  checks:
+    name: Lint, test, build, docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Formatting
+        run: make fmt-check
+
+      - name: go vet
+        run: make vet
+
+      - name: go.mod tidy
+        run: make tidy-check
+
+      - name: Unit tests (race)
+        run: make test
+
+      - name: Simulated acceptance tests (Terraform CLI + local simulator)
+        run: make testacc
+
+      - name: Build
+        run: make build
+
+      - name: Generated docs are current
+        run: make docs-check
+
+      - name: Validate examples against local build
+        run: make examples-check
+
+      - name: Python tooling tests
+        run: make py-test
+
+      - name: Vulnerability scan
+        run: make vuln
