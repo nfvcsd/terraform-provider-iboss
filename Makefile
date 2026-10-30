@@ -6,7 +6,7 @@ TERRAFORM          ?= terraform
 TERRAFORM_VERSION  ?= 1.16.6
 # Use registry.opentofu.org when TERRAFORM points at OpenTofu.
 TF_REGISTRY_HOST   ?= registry.terraform.io
-GOVULNCHECK_VERSION ?= v1.9.0
+GOVULNCHECK_VERSION ?= v1.7.0
 PYTHON             ?= python3
 BIN                := bin/terraform-provider-iboss
 # Extra tfplugindocs flags, e.g. DOCS_FLAGS=--providers-schema=schema.json
