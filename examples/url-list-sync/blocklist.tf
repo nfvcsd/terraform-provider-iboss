@@ -1,20 +1,4 @@
-# Manages iboss block list entries from "Gateway/Block List/*.yaml".
-#
-# Each file holds one security group's block list (see README.md). Adding an
-# entry to a file adds it in iboss; removing it deletes it in iboss. Entries
-# that already exist in iboss are adopted with import blocks, not recreated.
-terraform {
-  required_version = ">= 1.7.0"
-  required_providers {
-    iboss = {
-      source = "nfvcsd/iboss"
-    }
-  }
-}
-
-# Credentials come from IBOSS_* environment variables.
-provider "iboss" {}
-
+# Entries from "Gateway/Block List/*.yaml", one file per security group.
 locals {
   blocklist_dir = "${path.module}/Gateway/Block List"
   blocklist_files = {
@@ -24,9 +8,9 @@ locals {
   # One element per URL, keyed "<group_number>/<url>" (the resource's import ID).
   # A URL listed twice in one file fails here with "Duplicate object key".
   blocklist_entries = merge({}, [
-    for f, bl in local.blocklist_files : {
-      for e in coalesce(bl.entries, []) : "${bl.group_number}/${e.url}" => {
-        group_number                  = bl.group_number
+    for f, l in local.blocklist_files : {
+      for e in coalesce(l.entries, []) : "${l.group_number}/${e.url}" => {
+        group_number                  = l.group_number
         url                           = e.url
         note                          = try(e.note, null)
         is_regex                      = try(e.is_regex, null)
@@ -45,7 +29,7 @@ locals {
 # Current iboss contents, so only entries that already exist are imported.
 # Two files for the same group fail here with "Duplicate object key".
 data "iboss_blocklist" "live" {
-  for_each     = { for f, bl in local.blocklist_files : tostring(bl.group_number) => bl.group_number }
+  for_each     = { for f, l in local.blocklist_files : tostring(l.group_number) => l.group_number }
   group_number = each.value
 }
 
@@ -72,22 +56,4 @@ resource "iboss_blocklist_entry" "this" {
   weight                        = each.value.weight
   start_port                    = each.value.start_port
   end_port                      = each.value.end_port
-}
-
-# Warns (without blocking) when a file's group was renamed or removed in iboss.
-data "iboss_security_groups" "all" {}
-
-locals {
-  current_group_labels = [for g in data.iboss_security_groups.all.groups : "${g.group_number}/${g.name}"]
-  stale_blocklist_files = [
-    for f, bl in local.blocklist_files : f
-    if !contains(local.current_group_labels, "${bl.group_number}/${bl.group_name}")
-  ]
-}
-
-check "blocklist_groups_match_iboss" {
-  assert {
-    condition     = length(local.stale_blocklist_files) == 0
-    error_message = "These block list files no longer match a security group in iboss (renamed or removed): ${join(", ", local.stale_blocklist_files)}. Run scripts/sync_blocklists.py to refresh them."
-  }
 }

@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Sync iboss block lists into "Gateway/Block List/<number>. <group>.yaml".
+"""Sync iboss URL lists into YAML, one file per security group and list.
 
-Reads every security group's block list through the Terraform configuration in
-./export (read-only data sources), then writes one YAML file per group. Files
-for groups that no longer exist are removed. Terraform in the repository root
-manages the entries listed in these files.
+  Gateway/Block List/<number>. <group>.yaml
+  Gateway/Allowlist/<number>. <group>.yaml
+
+Folders follow the iboss API documentation (Gateway → Block List, Allowlist);
+file names follow the group menu in the iboss console. The script runs the
+read-only Terraform configuration in ./export, writes the files, removes files
+for groups that no longer exist, and renames files of renamed groups. Terraform
+in the repository root manages the entries listed in these files.
 
 Usage (from the repository root, with IBOSS_* credentials in the environment):
-  python3 scripts/sync_blocklists.py            # refuse if the folder has uncommitted edits
-  python3 scripts/sync_blocklists.py --force    # overwrite uncommitted edits
-  python3 scripts/sync_blocklists.py --from-json blocklists.json   # skip Terraform
+  python3 scripts/sync_lists.py            # refuse if the list folders have uncommitted edits
+  python3 scripts/sync_lists.py --force    # overwrite uncommitted edits
+  python3 scripts/sync_lists.py --from-json outputs.json   # `terraform output -json`; skip Terraform
 
 Only the Python standard library is used.
 """
@@ -22,10 +26,22 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-BLOCKLIST_DIR = Path("Gateway") / "Block List"
+
+@dataclass(frozen=True)
+class ListSpec:
+    output: str  # Terraform output name in export/
+    folder: Path  # folder relative to the repository root
+    title: str  # used in file headers
+
+
+LISTS = (
+    ListSpec("blocklists", Path("Gateway") / "Block List", "block list"),
+    ListSpec("allowlists", Path("Gateway") / "Allowlist", "allowlist"),
+)
 
 # Managed entry fields, in output order. A field is written only when it is
 # set to something other than its zero value; omitted fields are left as they
@@ -74,8 +90,8 @@ def _comment(text: str) -> str:
     return re.sub(r"[\r\n]+", " ", text)
 
 
-def render(group: dict[str, Any]) -> str:
-    """Render one group's block list as YAML."""
+def render(group: dict[str, Any], spec: ListSpec) -> str:
+    """Render one group's list as YAML."""
     number = group["group_number"]
     name = group["group_name"]
     entries = group.get("entries") or []
@@ -85,12 +101,12 @@ def render(group: dict[str, Any]) -> str:
     seen: set[str] = set()
     for e in managed:
         if e["url"] in seen:
-            raise SyncError(f"group {number} lists {e['url']!r} more than once; remove the duplicate in iboss first")
+            raise SyncError(f"group {number}'s {spec.title} lists {e['url']!r} more than once; remove the duplicate in iboss first")
         seen.add(e["url"])
 
     lines = [
-        f"# iboss block list for security group {number} ({_comment(name)}).",
-        "# Synced from iboss by scripts/sync_blocklists.py. Terraform applies edits to this file.",
+        f"# iboss {spec.title} for security group {number} ({_comment(name)}).",
+        "# Synced from iboss by scripts/sync_lists.py. Terraform applies edits to this file.",
         "# Fields left out keep their current value in iboss.",
         f"group_number: {number}",
         f"group_name: {_quote(name)}",
@@ -115,33 +131,29 @@ def render(group: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def validate(data: Any) -> list[dict[str, Any]]:
+def validate(data: Any, spec: ListSpec) -> list[dict[str, Any]]:
     if not isinstance(data, list):
-        raise SyncError("expected a list of groups")
+        raise SyncError(f"{spec.output}: expected a list of groups")
     numbers: set[int] = set()
     for g in data:
         if not isinstance(g, dict) or not isinstance(g.get("group_number"), int) or not isinstance(g.get("group_name"), str):
-            raise SyncError(f"malformed group: {g!r}")
+            raise SyncError(f"{spec.output}: malformed group: {g!r}")
         if g["group_number"] in numbers:
-            raise SyncError(f"group number {g['group_number']} appears more than once")
+            raise SyncError(f"{spec.output}: group number {g['group_number']} appears more than once")
         numbers.add(g["group_number"])
         for e in g.get("entries") or []:
             if not isinstance(e, dict) or not isinstance(e.get("url"), str) or not e["url"]:
-                raise SyncError(f"malformed entry in group {g['group_number']}: {e!r}")
+                raise SyncError(f"{spec.output}: malformed entry in group {g['group_number']}: {e!r}")
     return data
 
 
-def plan_files(groups: list[dict[str, Any]]) -> dict[str, str]:
-    files: dict[str, str] = {}
-    for g in groups:
-        name = file_name(g["group_number"], g["group_name"])
-        files[name] = render(g)
-    return files
+def plan_files(groups: list[dict[str, Any]], spec: ListSpec) -> dict[str, str]:
+    return {file_name(g["group_number"], g["group_name"]): render(g, spec) for g in groups}
 
 
-def write_files(root: Path, files: dict[str, str]) -> dict[str, list[str]]:
-    """Write files into root/Gateway/Block List and remove stale *.yaml files."""
-    target = (root / BLOCKLIST_DIR).resolve()
+def write_files(root: Path, folder: Path, files: dict[str, str]) -> dict[str, list[str]]:
+    """Write files into root/folder and remove stale *.yaml files there."""
+    target = (root / folder).resolve()
     target.mkdir(parents=True, exist_ok=True)
     result: dict[str, list[str]] = {"added": [], "updated": [], "unchanged": [], "removed": []}
     for name, content in sorted(files.items()):
@@ -163,12 +175,12 @@ def write_files(root: Path, files: dict[str, str]) -> dict[str, list[str]]:
     return result
 
 
-def uncommitted_changes(root: Path) -> list[str]:
-    """Return uncommitted paths under the block list folder (empty outside git)."""
+def uncommitted_changes(root: Path, folders: list[Path]) -> list[str]:
+    """Return uncommitted paths under the list folders (empty outside git)."""
     if shutil.which("git") is None:
         return []
     proc = subprocess.run(
-        ["git", "-C", str(root), "status", "--porcelain", "--", str(BLOCKLIST_DIR)],
+        ["git", "-C", str(root), "status", "--porcelain", "--", *map(str, folders)],
         capture_output=True, text=True, check=False,
     )
     if proc.returncode != 0:  # not a git repository
@@ -176,7 +188,26 @@ def uncommitted_changes(root: Path) -> list[str]:
     return [line for line in proc.stdout.splitlines() if line.strip()]
 
 
-def terraform_export(root: Path, terraform: str) -> Any:
+def parse_output(out: str) -> dict[str, Any]:
+    """Parse `terraform output -json`, skipping any warnings printed before it.
+
+    Returns {output name: value}. Accepts Terraform's {"name": {"value": …}}
+    form or a plain {"name": value} mapping.
+    """
+    lines = out.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith("{"):
+            continue
+        try:
+            data = json.loads("\n".join(lines[i:]))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            return {k: v["value"] if isinstance(v, dict) and "value" in v else v for k, v in data.items()}
+    raise SyncError(f"terraform output -json did not return a JSON object:\n{out}")
+
+
+def terraform_export(root: Path, terraform: str) -> dict[str, Any]:
     export = root / "export"
     env = {**os.environ, "TF_IN_AUTOMATION": "1", "CHECKPOINT_DISABLE": "1"}
 
@@ -190,49 +221,43 @@ def terraform_export(root: Path, terraform: str) -> Any:
     # The export configuration only has data sources and outputs, so apply
     # reads from iboss and changes nothing there.
     run("apply", "-auto-approve", "-input=false", "-no-color")
-    out = run("output", "-json", "blocklists")
-    return parse_output(out)
-
-
-def parse_output(out: str) -> Any:
-    """Parse `terraform output -json`, skipping any warnings printed before it."""
-    lines = out.splitlines()
-    for i, line in enumerate(lines):
-        if line.startswith(("[", "{")):
-            try:
-                return json.loads("\n".join(lines[i:]))
-            except json.JSONDecodeError:
-                continue
-    raise SyncError(f"terraform output -json blocklists did not return JSON:\n{out}")
+    return parse_output(run("output", "-json"))
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".", help="repository root (default: current directory)")
     ap.add_argument("--terraform", default=os.environ.get("TERRAFORM", "terraform"), help="Terraform or OpenTofu binary")
-    ap.add_argument("--from-json", help="read `terraform output -json blocklists` from this file instead of running Terraform")
-    ap.add_argument("--force", action="store_true", help="overwrite uncommitted changes in the block list folder")
+    ap.add_argument("--from-json", help="read `terraform output -json` from this file instead of running Terraform")
+    ap.add_argument("--force", action="store_true", help="overwrite uncommitted changes in the list folders")
     args = ap.parse_args(argv)
 
     root = Path(args.root).resolve()
     try:
-        dirty = uncommitted_changes(root)
+        dirty = uncommitted_changes(root, [spec.folder for spec in LISTS])
         if dirty and not args.force:
-            raise SyncError("the block list folder has uncommitted changes; commit or discard them, or pass --force:\n  "
+            raise SyncError("the list folders have uncommitted changes; commit or discard them, or pass --force:\n  "
                             + "\n  ".join(dirty))
         if args.from_json:
-            data = json.loads(Path(args.from_json).read_text(encoding="utf-8"))
+            outputs = parse_output(Path(args.from_json).read_text(encoding="utf-8"))
         else:
-            data = terraform_export(root, args.terraform)
-        result = write_files(root, plan_files(validate(data)))
+            outputs = terraform_export(root, args.terraform)
+        # Validate and render everything before writing anything.
+        planned = []
+        for spec in LISTS:
+            if spec.output not in outputs:
+                raise SyncError(f"export/ has no {spec.output!r} output; update export/main.tf")
+            planned.append((spec, plan_files(validate(outputs[spec.output], spec), spec)))
+        results = [(spec, write_files(root, spec.folder, files)) for spec, files in planned]
     except SyncError as err:
         print(f"error: {err}", file=sys.stderr)
         return 1
-    for kind in ("added", "updated", "removed"):
-        for name in result[kind]:
-            print(f"{kind:8} {BLOCKLIST_DIR / name}")
-    print(f"{len(result['unchanged'])} unchanged, {len(result['added'])} added, "
-          f"{len(result['updated'])} updated, {len(result['removed'])} removed")
+    for spec, result in results:
+        for kind in ("added", "updated", "removed"):
+            for name in result[kind]:
+                print(f"{kind:8} {spec.folder / name}")
+        print(f"{spec.folder}: {len(result['unchanged'])} unchanged, {len(result['added'])} added, "
+              f"{len(result['updated'])} updated, {len(result['removed'])} removed")
     return 0
 
 
