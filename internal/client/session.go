@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -178,8 +179,11 @@ func (c *Client) loadAccount(ctx context.Context, s *session) error {
 }
 
 type cluster struct {
-	ProductFamily string          `json:"productFamily"`
-	Members       []clusterMember `json:"members"`
+	ClusterID      FlexInt         `json:"clusterId"`
+	ClusterName    string          `json:"clusterName"`
+	ProductFamily  string          `json:"productFamily"`
+	DefaultCluster FlexInt         `json:"defaultCluster"`
+	Members        []clusterMember `json:"members"`
 }
 
 type clusterMember struct {
@@ -191,9 +195,12 @@ type clusterMember struct {
 
 // discoverGateway implements "Get API Base Domains":
 // GET https://{{baseApiDomain}}/ibcloud/web/account/clusters?accountSettingsId=…
-// and selects masterAdminInterfaceDns of the primary member of the "swg"
-// product family. The discovered host is validated before any credential is
-// sent to it.
+// The documentation says the gateway API uses "the primary gateway node of
+// the default node cluster", so among "swg" clusters it prefers those with
+// defaultCluster = 1 (a documented response field), then takes the
+// masterAdminInterfaceDns of the primary member. If no swg cluster carries the
+// flag, every swg cluster is considered. The discovered host is validated
+// before any credential is sent to it.
 func (c *Client) discoverGateway(ctx context.Context, s *session) (string, error) {
 	var clusters []cluster
 	err := c.getJSON(ctx, s, request{
@@ -204,16 +211,28 @@ func (c *Client) discoverGateway(ctx context.Context, s *session) (string, error
 	if err != nil {
 		return "", &DiscoveryError{Step: "gateway discovery", Err: err}
 	}
-	found := map[string]bool{}
+	var swg, defaults []cluster
 	for _, cl := range clusters {
 		if cl.ProductFamily != "swg" {
 			continue
 		}
+		swg = append(swg, cl)
+		if cl.DefaultCluster.Valid && cl.DefaultCluster.Int64 == 1 {
+			defaults = append(defaults, cl)
+		}
+	}
+	candidates := swg
+	if len(defaults) > 0 {
+		candidates = defaults
+	}
+	found := map[string]string{} // host -> cluster description
+	for _, cl := range candidates {
+		desc := fmt.Sprintf("cluster %q (id %d)", cl.ClusterName, cl.ClusterID.Int64)
 		for _, m := range cl.Members {
 			// The example returns primary as the number 1; the collection's
 			// script compares it loosely with "1". FlexInt accepts both.
 			if m.Primary.Valid && m.Primary.Int64 == 1 && m.CloudNode.MasterAdminInterfaceDNS != "" {
-				found[strings.ToLower(m.CloudNode.MasterAdminInterfaceDNS)] = true
+				found[strings.ToLower(m.CloudNode.MasterAdminInterfaceDNS)] = desc
 			}
 		}
 	}
@@ -221,7 +240,14 @@ func (c *Client) discoverGateway(ctx context.Context, s *session) (string, error
 		return "", &DiscoveryError{Step: "gateway discovery", Err: errors.New(`no primary member of the "swg" product family was returned; set gateway_host`)}
 	}
 	if len(found) > 1 {
-		return "", &DiscoveryError{Step: "gateway discovery", Err: fmt.Errorf("%d distinct primary gateway hosts were returned; set gateway_host", len(found))}
+		hosts := make([]string, 0, len(found))
+		for h, d := range found {
+			hosts = append(hosts, h+" ("+d+")")
+		}
+		sort.Strings(hosts)
+		return "", &DiscoveryError{Step: "gateway discovery", Err: fmt.Errorf(
+			"%d primary gateway hosts were returned and none is uniquely marked as the default cluster; "+
+				"set gateway_host (or IBOSS_GATEWAY_HOST) to one of: %s", len(found), strings.Join(hosts, ", "))}
 	}
 	var host string
 	for h := range found {
