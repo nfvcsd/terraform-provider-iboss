@@ -37,7 +37,7 @@ From the collection introduction and request definitions:
 
 | Library | Host | Provider handling |
 |---|---|---|
-| Authentication | `{{ibossAccounts}}`; the introduction says `accounts.ibosscloud.com`, which does not resolve (Q13) | Legacy login only; default `accounts.iboss.com`, override with `accounts_host` |
+| Authentication | `{{ibossAccounts}}`; the introduction says `accounts.ibosscloud.com`, which does not resolve (Q13) | Legacy login only; default `accounts.iboss.com` (confirmed by a real login), override with `accounts_host` |
 | Core | `api.ibosscloud.com` (`{{baseApiDomain}}`) | Fixed default host |
 | Gateway | Primary gateway node (`{{gatewayNodeApiDomain}}`) | Discovered, or `gateway_host` |
 | Reporting | Primary reporting node | Not used yet |
@@ -142,4 +142,4 @@ Not started unless noted. Run the inventory command above for a per-operation li
 | Q10 | Legacy token lifetime. | One re-login on 401 when no TOTP code is configured |
 | Q11 | The "Get API Base Domains" test script only parses the clusters response when it does **not** have exactly one element — likely a script bug. | Provider always parses the response |
 | Q12 | Are all gateway node hosts guaranteed to be under `ibosscloud.com`? (All documented examples are.) | Discovery rejects other domains; set `gateway_host` to override |
-| Q13 | What is the legacy login host? The introduction names `accounts.ibosscloud.com`, but that name does not exist in public DNS (NXDOMAIN, checked 2026-11-09 via dns.google), and the login request uses the unpublished `{{ibossAccounts}}` variable. `accounts.iboss.com` resolves (136.228.192.15) in the same block as `api.ibosscloud.com`. | Default changed to `accounts.iboss.com` after a real login failed with "no such host"; `accounts_host` / `IBOSS_ACCOUNTS_HOST` overrides it. Unverified against the live service by tests |
+| Q13 | What is the legacy login host? The introduction names `accounts.ibosscloud.com`, but that name does not exist in public DNS (NXDOMAIN, checked 2026-11-09 via dns.google), and the login request uses the unpublished `{{ibossAccounts}}` variable. `accounts.iboss.com` resolves (136.228.192.15) in the same block as `api.ibosscloud.com`. | **Resolved:** default is `accounts.iboss.com`; a real legacy login succeeded through it on 2026-11-09 (account discovery and security-group read completed). `accounts_host` / `IBOSS_ACCOUNTS_HOST` overrides it |

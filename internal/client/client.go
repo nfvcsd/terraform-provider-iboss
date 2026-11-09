@@ -26,8 +26,9 @@ import (
 // authentication, but that name does not exist in public DNS (checked
 // 2026-11-09); the login request itself uses the unpublished {{ibossAccounts}}
 // variable. "accounts.iboss.com" resolves into the same iboss address block
-// as api.ibosscloud.com and is used instead. Override with Config.AccountsHost
-// (provider argument accounts_host). See docs/api-coverage.md, Q13.
+// as api.ibosscloud.com; a real legacy login through it succeeded on
+// 2026-11-09. Override with Config.AccountsHost (provider argument
+// accounts_host). See docs/api-coverage.md, Q13.
 const (
 	DefaultCoreHost     = "api.ibosscloud.com"
 	DefaultAccountsHost = "accounts.iboss.com"
