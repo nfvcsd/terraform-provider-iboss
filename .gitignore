@@ -45,3 +45,4 @@ terraform-provider-iboss
 __pycache__/
 *.pyc
 .DS_Store
+/Claude outputs
