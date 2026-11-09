@@ -126,14 +126,33 @@ Not started unless noted. Run the inventory command above for a per-operation li
 - **Timed entries** (`isTimedUrl`, `timedUrl`, `timedUrlExpiresInMinutes`) are exposed read-only in
   data sources; resources do not create them because the countdown would cause perpetual drift.
 
+## Live verification
+
+Automated tests never contact iboss. The results below come from NFV staff running the provider against the
+district's own tenant (provider build 0.0.3, legacy username/password login). They are recorded so the
+remaining risk stays visible.
+
+| Date | Operation | Result |
+|---|---|---|
+| 2026-11-09 | Login (Legacy) via `accounts.iboss.com` | Works (resolved Q13) |
+| 2026-11-09 | Get Primary Account ID; Get API Base Domains | Works. The account has two `swg` clusters; selecting the one flagged `defaultCluster` works |
+| 2026-11-09 | Get Security Groups | Works (7 groups) |
+| 2026-11-09 | Get Block List; Get Allow List (all groups) | Works; every block list and allowlist entry was imported with no planned changes |
+| 2026-11-09 | Add URL to Block List | Works; the new entry was found on read-back with the configured spelling |
+| 2026-11-09 | Delete URL from Block List | Works; the entry was absent on read-back |
+
+Not yet exercised live: API-key authentication (Q1); Add/Delete URL on an allowlist; replacing an existing
+entry (a delete followed by an add, triggered by changing any argument); legacy re-login after token expiry;
+legacy login with a TOTP code.
+
 ## Unresolved questions
 
 | # | Question | Effect today |
 |---|---|---|
-| Q1 | The introduction says API-key auth "uses the token variable", and requests send `Authorization: Token {{token}}`, but no request exchanges a key for a token. Is the API key sent directly as the token? | Implemented as `Authorization: Token <api key>`; verify with iboss before production use |
+| Q1 | The introduction says API-key auth "uses the token variable", and requests send `Authorization: Token {{token}}`, but no request exchanges a key for a token. Is the API key sent directly as the token? | Implemented as `Authorization: Token <api key>`; still unverified live (legacy login is verified) |
 | Q2 | Gateway requests send the **core** host's `XSRF-TOKEN` cookie and the token as `JESSIONID` (sic). Are these required by the gateway at all? | Sent exactly as documented |
-| Q3 | Server defaults for fields omitted from an add request, and behaviour when adding a URL that already exists (update, duplicate, or error)? | Fields omitted; existence checked before add |
-| Q4 | Does the server normalize stored URLs (case, trailing slash, scheme)? | Equivalence matching described above |
+| Q3 | Server defaults for fields omitted from an add request, and behaviour when adding a URL that already exists (update, duplicate, or error)? | Fields omitted; existence checked before add. Live: an add with only the configured fields succeeded (2026-11-09); duplicate-add behaviour still unknown |
+| Q4 | Does the server normalize stored URLs (case, trailing slash, scheme)? | Equivalence matching described above. Live: a newly added block list URL was stored exactly as configured (2026-11-09) |
 | Q5 | Meanings of `direction`, `type`, `groupInheritancePolicy`, `priority` vs `weight`; unit of `defaultTimedUrlTimeout`; `timedUrl` (seconds, per comment) vs `timedUrlExpiresInMinutes`. | Passed through as integers without enum validation |
 | Q6 | Replace V2/V3: does `policyNumber` equal the group number? Does replace remove entries with other attributes, and do the top-level fields apply to every entry? | Not implemented |
 | Q7 | Replace V3 requires gateway "10.3.0.45+" for the allowlist but "10.3.0.4+" for the block list — typo? | Not implemented |
