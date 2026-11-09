@@ -194,9 +194,10 @@ report actual results. Do not claim nonexistent tooling or unrun tests passed.
   credentials to release jobs and use configured protected environments where needed.
 - Confirm the registry namespace, signing setup, and publishing destination before
   initial publication. The repository follows HashiCorp's provider requirements as
-  `nfvcsd/terraform-provider-iboss` (Go module `github.com/nfvcsd/terraform-provider-iboss`);
-  publishing to a public registry has not been decided. Preparing workflows does not
-  authorize publishing.
+  `nfvcsd/terraform-provider-iboss` (Go module `github.com/nfvcsd/terraform-provider-iboss`)
+  and is published on the public Terraform Registry as `nfvcsd/iboss` under MPL-2.0.
+  Publishing a GitHub release publishes it to the registry, so only a maintainer
+  publishes releases. Preparing workflows or drafts does not authorize publishing.
 - Deployment in this repository means distributing the provider artifact. Do not
   add workflows that apply Terraform to live iboss environments. Keep Git history,
   release versions, artifacts, and checks traceable. Fix releases with new versions

@@ -1,18 +1,25 @@
 ---
 page_title: "iboss Provider"
 description: |-
-  Manage iboss Zero Trust SSE configuration with Terraform. Private NFVCSD build; not affiliated with or endorsed by iboss or HashiCorp.
+  Manage iboss Zero Trust SSE configuration with Terraform. Maintained by North Fayette Valley CSD; not affiliated with or endorsed by iboss or HashiCorp.
 ---
 
 # iboss Provider
 
 The iboss provider manages configuration of the iboss Zero Trust SSE platform through the
 [iboss API](https://documenter.getpostman.com/view/26524233/2s93RUuXjk). It is maintained by
-North Fayette Valley CSD for internal use and is not affiliated with or endorsed by iboss or HashiCorp.
+North Fayette Valley Community School District and is not affiliated with or endorsed by iboss or
+HashiCorp.
+
+~> **Provided as is.** This provider is provided "as is", without warranty of any kind. North Fayette
+Valley Community School District is not responsible for any damage arising from its use. See the
+[license](https://github.com/nfvcsd/terraform-provider-iboss/blob/main/LICENSE) (MPL-2.0, sections 6
+and 7). Test changes on a non-production security group first.
 
 The current release covers gateway **URL allowlists and block lists** per security (filtering) group,
-plus the lookups needed to target them. See `docs/api-coverage.md` in the repository for what is and is
-not implemented.
+plus the lookups needed to target them. See
+[`docs/api-coverage.md`](https://github.com/nfvcsd/terraform-provider-iboss/blob/main/docs/api-coverage.md)
+for what is and is not implemented.
 
 ## Example Usage
 

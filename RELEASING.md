@@ -1,9 +1,14 @@
 # Releasing
 
 Releases are built by `.github/workflows/release.yml` when a version tag (`v*`) is pushed. The workflow
-uses GoReleaser to create a **draft** GitHub release in this private repository with a zip archive per
-platform, `SHA256SUMS`, a detached GPG signature of the checksums, and the registry manifest. Nothing is
-pushed to a Terraform registry.
+uses GoReleaser to create a **draft** GitHub release with a zip archive per platform, `SHA256SUMS`, a
+detached GPG signature of the checksums, and the registry manifest.
+
+The provider is published on the public Terraform Registry as
+[`nfvcsd/iboss`](https://registry.terraform.io/providers/nfvcsd/iboss/latest). The registry ingests a
+release when it is **published** on GitHub (drafts are ignored), checks the signature against the public
+key registered for the `nfvcsd` namespace, and renders the documentation from `docs/` at the tagged
+commit. Publishing a draft therefore releases it to everyone; treat that click as the release.
 
 ## Signing key
 
@@ -19,16 +24,17 @@ The private key and its passphrase are stored as the repository secrets `GPG_PRI
 `GPG_PASSPHRASE`, with a backup in the maintainer's password manager. Rotate the key before it expires:
 generate a new one, replace both secrets and the public key file, and note the change in `CHANGELOG.md`.
 
-### GitHub Free limitations
+### Release protections
 
-The organization is on GitHub Free, so this private repository cannot use environment secrets, required
-reviewers, or tag rulesets. The workflow still declares `environment: release`; on Free it has no effect,
-and the protections can be configured there if the plan changes. Until then:
+The repository is public, so GitHub Free now supports environment secrets, required reviewers and tag
+rulesets. The workflow already declares `environment: release`. Recommended next steps, in the
+repository settings:
 
-- anyone with write access can push a `v*` tag and run a release, so keep write access limited;
-- a workflow changed in a pull request from a branch of this repository can read repository secrets, so
-  review changes under `.github/workflows/` before running them;
-- `ci.yml` never references the signing secrets.
+- move `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` from repository secrets to the `release` environment and
+  require a reviewer for it;
+- add a tag ruleset so only maintainers can create or delete `v*` tags;
+- keep reviewing changes under `.github/workflows/` before running them. `ci.yml` never references the
+  signing secrets.
 
 ## Cutting a release
 
@@ -38,16 +44,22 @@ and the protections can be configured there if the plan changes. Until then:
 
    ```sh
    git checkout main && git pull
-   git tag -a v0.1.0 -m "v0.1.0"
-   git push origin v0.1.0
+   git tag -a v0.2.0 -m "v0.2.0"
+   git push origin v0.2.0
    ```
 
 3. Watch **Actions → Release**. When it finishes, open **Releases**, check the draft has an archive for each
    platform plus `_SHA256SUMS`, `_SHA256SUMS.sig` and `_manifest.json`, then publish it.
+4. Within a few minutes the new version appears on the registry. If it doesn't, confirm the release is
+   published (not a draft) and signed with the key registered for the namespace, then use **Resync** on
+   the provider's page in the registry.
 
 Fix a bad release with a new version. Never replace published artifacts.
 
-## Verifying and installing a release
+## Verifying a release
+
+`terraform init` verifies registry downloads against the signing key automatically. To check an archive
+by hand:
 
 ```sh
 gpg --import keys/iboss-provider-signing.asc
@@ -55,18 +67,10 @@ gpg --verify terraform-provider-iboss_0.1.0_SHA256SUMS.sig terraform-provider-ib
 shasum -a 256 -c terraform-provider-iboss_0.1.0_SHA256SUMS --ignore-missing
 ```
 
-Terraform finds the provider in a local mirror. On an Apple Silicon Mac:
+## Moving off a local mirror
 
-```sh
-dest=~/.terraform.d/plugins/registry.terraform.io/nfvcsd/iboss/0.1.0/darwin_arm64
-mkdir -p "$dest"
-unzip terraform-provider-iboss_0.1.0_darwin_arm64.zip -d "$dest"
-```
-
-Use the matching `<os>_<arch>` folder on other systems (for example `linux_amd64` in CI). Remove older
-development builds from the same folder tree, then run `terraform init -upgrade`.
-
-The provider address compiled into `main.go` is `registry.terraform.io/nfvcsd/iboss`. Hosting the files as a
-[provider network mirror](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol)
-or in an HCP Terraform private registry are later options; the public Terraform Registry would require a
-public repository named `terraform-provider-iboss`.
+Before the registry listing, builds were installed into a filesystem mirror under
+`~/.terraform.d/plugins/registry.terraform.io/nfvcsd/iboss/`. Terraform prefers that folder over the
+registry, so remove it and run `terraform init -upgrade` to install from the registry instead. The
+provider address (`registry.terraform.io/nfvcsd/iboss`) is unchanged, so state and lock files need no
+edits; the lock file gains registry hashes on the next `init`.

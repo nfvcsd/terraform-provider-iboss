@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- Licensed under the Mozilla Public License 2.0 (`LICENSE`).
+
 ### Changed
 
 - The repository is now `nfvcsd/terraform-provider-iboss` and the Go module path is
   `github.com/nfvcsd/terraform-provider-iboss`, following HashiCorp's provider naming requirements. The
-  provider address (`nfvcsd/iboss`) and release artifact names are unchanged. Nothing is published to a
-  registry yet.
+  provider address (`nfvcsd/iboss`) and release artifact names are unchanged.
+- The provider is published on the public Terraform Registry as `nfvcsd/iboss`.
+- README rewritten with a getting-started guide and an "as is" disclaimer; the registry docs carry the
+  same disclaimer.
 
 ## 0.1.0 (2026-11-09)
 
