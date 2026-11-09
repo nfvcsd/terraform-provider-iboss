@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
 )
 
 // Environment variables read when the matching provider argument is not set.

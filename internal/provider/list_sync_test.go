@@ -20,9 +20,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6/tf6server"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
-	"github.com/nfvcsd/iboss-terraform/internal/provider"
-	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/provider"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/testutil"
 )
 
 // cliHarness runs the real Terraform (or OpenTofu) CLI against an in-process

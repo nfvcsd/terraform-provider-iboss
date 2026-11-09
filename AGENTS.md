@@ -193,9 +193,10 @@ report actual results. Do not claim nonexistent tooling or unrun tests passed.
   registry manifest, checksums, and required signatures. Restrict publishing/signing
   credentials to release jobs and use configured protected environments where needed.
 - Confirm the registry namespace, signing setup, and publishing destination before
-  initial publication. Public Registry discovery requires a public repository named
-  `terraform-provider-{NAME}`; the current `iboss-terraform` name needs an explicit
-  publishing decision later. Preparing workflows does not authorize publishing.
+  initial publication. The repository follows HashiCorp's provider requirements as
+  `nfvcsd/terraform-provider-iboss` (Go module `github.com/nfvcsd/terraform-provider-iboss`);
+  publishing to a public registry has not been decided. Preparing workflows does not
+  authorize publishing.
 - Deployment in this repository means distributing the provider artifact. Do not
   add workflows that apply Terraform to live iboss environments. Keep Git history,
   release versions, artifacts, and checks traceable. Fix releases with new versions

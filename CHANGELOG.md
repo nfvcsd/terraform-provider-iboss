@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The repository is now `nfvcsd/terraform-provider-iboss` and the Go module path is
+  `github.com/nfvcsd/terraform-provider-iboss`, following HashiCorp's provider naming requirements. The
+  provider address (`nfvcsd/iboss`) and release artifact names are unchanged. Nothing is published to a
+  registry yet.
+
 ## 0.1.0 (2026-11-09)
 
 First release.

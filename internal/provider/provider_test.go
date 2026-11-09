@@ -10,8 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 
-	"github.com/nfvcsd/iboss-terraform/internal/provider"
-	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/provider"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/testutil"
 )
 
 const providerAPIKey = `

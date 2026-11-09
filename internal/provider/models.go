@@ -3,7 +3,7 @@ package provider
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
 )
 
 // entryCommon holds attributes shared by allowlist and blocklist entries in
