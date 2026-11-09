@@ -608,3 +608,23 @@ func TestErrorSnippetRedactedBeforeTruncation(t *testing.T) {
 		t.Errorf("partial secret leaked: %v", err)
 	}
 }
+
+func TestLegacyLoginDefaultsToAccountsIbossCom(t *testing.T) {
+	testutil.ClearIBOSSEnv(t)
+	sim := testutil.NewSimulator(t)
+	cfg := client.Config{Username: testutil.SimUsername, Password: testutil.SimPassword}
+	sim.ConfigureClient(&cfg)
+	cfg.AccountsHost = "" // use the built-in default
+	c, err := client.New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.ListSecurityGroups(context.Background())
+	var blocked *client.BlockedDestinationError
+	if !errors.As(err, &blocked) || blocked.Host != "accounts.iboss.com" {
+		t.Fatalf("err = %v; want the login to target accounts.iboss.com (blocked by the test transport)", err)
+	}
+	if client.DefaultAccountsHost != "accounts.iboss.com" {
+		t.Errorf("DefaultAccountsHost = %q", client.DefaultAccountsHost)
+	}
+}

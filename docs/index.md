@@ -54,8 +54,8 @@ automatically; prefer an API key for unattended runs.
 
 ### What the provider does on first use
 
-1. API key: sends `Authorization: Token <key>`. Legacy: calls `accounts.ibosscloud.com` with HTTP Basic
-   authentication to obtain a session token.
+1. API key: sends `Authorization: Token <key>`. Legacy: calls `accounts.iboss.com` (or `accounts_host`) with
+   HTTP Basic authentication to obtain a session token.
 2. Calls `api.ibosscloud.com` to find the account (the primary account unless `account_settings_id` is set)
    and to obtain the session cookies the gateway API expects.
 3. Unless `gateway_host` is set, discovers the primary gateway node from the account's node clusters. A
@@ -79,6 +79,7 @@ Credentials and session tokens are never written to Terraform state.
 ### Optional
 
 - `account_settings_id` (Number) iboss account settings ID. When omitted, the provider discovers the primary account (the one with no delegated super admin). Falls back to `IBOSS_ACCOUNT_SETTINGS_ID`.
+- `accounts_host` (String) Host name used for legacy username/password login. Defaults to `accounts.iboss.com`. Only needed if iboss directs you to a different login host. Falls back to `IBOSS_ACCOUNTS_HOST`.
 - `api_key` (String, Sensitive) iboss API key, sent as `Authorization: Token <key>`. Conflicts with `username`/`password`. Falls back to `IBOSS_API_KEY`.
 - `gateway_host` (String) Host name of the primary gateway node (for example `cn-0000.ibosscloud.com`). When omitted, it is discovered from the account's node clusters. Falls back to `IBOSS_GATEWAY_HOST`.
 - `password` (String, Sensitive) Administrator password for legacy session login. Falls back to `IBOSS_PASSWORD`.

@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/nfvcsd/iboss-terraform/internal/client"
@@ -241,6 +243,67 @@ func TestAccSecurityGroupsListRejectsDuplicateNumbers(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config:      providerAPIKey + `data "iboss_security_groups" "all" {}`,
 			ExpectError: regexp.MustCompile(`appears more than once`),
+		}},
+	})
+}
+
+// keepAccountsHost points the client at the simulator but keeps the
+// accounts host the provider resolved from configuration.
+func keepAccountsHost(sim *testutil.Simulator) map[string]func() (tfprotov6.ProviderServer, error) {
+	hook := func(c *client.Config) {
+		acct := c.AccountsHost
+		sim.ConfigureClient(c)
+		c.AccountsHost = acct
+	}
+	return map[string]func() (tfprotov6.ProviderServer, error){
+		"iboss": providerserver.NewProtocol6WithError(provider.New("test", provider.WithClientConfig(hook))()),
+	}
+}
+
+func TestAccProvider_accountsHost(t *testing.T) {
+	sim := newAcc(t)
+	sim.APIKey = ""
+	legacy := `
+provider "iboss" {
+  username      = "` + testutil.SimUsername + `"
+  password      = "` + testutil.SimPassword + `"
+  accounts_host = "` + testutil.AccountsHost + `"
+}` + dsOnly
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: keepAccountsHost(sim),
+		Steps: []resource.TestStep{
+			{
+				Config: legacy,
+				Check:  resource.TestCheckResourceAttr("data.iboss_security_group.g", "name", "Default"),
+			},
+			{
+				Config: `
+provider "iboss" {
+  username      = "u"
+  password      = "p"
+  accounts_host = "https://accounts.example.com"
+}` + dsOnly,
+				ExpectError: regexp.MustCompile(`invalid accounts host`),
+			},
+			{Config: legacy},
+		},
+	})
+	if n := sim.CountRequests("GET", "/ibossauth/web/tokens"); n == 0 {
+		t.Error("login never reached the configured accounts host")
+	}
+}
+
+func TestAccProvider_accountsHostFromEnv(t *testing.T) {
+	sim := newAcc(t)
+	sim.APIKey = ""
+	t.Setenv(provider.EnvUsername, testutil.SimUsername)
+	t.Setenv(provider.EnvPassword, testutil.SimPassword)
+	t.Setenv(provider.EnvAccountsHost, testutil.AccountsHost)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: keepAccountsHost(sim),
+		Steps: []resource.TestStep{{
+			Config: `provider "iboss" {}` + dsOnly,
+			Check:  resource.TestCheckResourceAttr("data.iboss_security_group.g", "name", "Default"),
 		}},
 	})
 }
