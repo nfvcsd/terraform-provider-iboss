@@ -1,4 +1,4 @@
-module github.com/nfvcsd/iboss-terraform
+module github.com/nfvcsd/terraform-provider-iboss
 
 go 1.26.0
 

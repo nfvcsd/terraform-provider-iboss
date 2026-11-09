@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
-	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/testutil"
 )
 
 func newSim(t *testing.T) (*testutil.Simulator, *client.Client) {

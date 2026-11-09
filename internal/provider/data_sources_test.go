@@ -8,9 +8,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
-	"github.com/nfvcsd/iboss-terraform/internal/provider"
-	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/provider"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/testutil"
 )
 
 func TestAccDataSources(t *testing.T) {

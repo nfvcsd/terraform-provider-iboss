@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
 )
 
 // Synthetic hosts. ".iboss.test" is a reserved test TLD; none resolve.

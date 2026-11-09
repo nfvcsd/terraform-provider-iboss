@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/nfvcsd/iboss-terraform/internal/client"
-	"github.com/nfvcsd/iboss-terraform/internal/testutil"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/client"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/testutil"
 )
 
 func entryConfig(kind string, group int, url, extra string) string {

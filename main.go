@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/nfvcsd/iboss-terraform/internal/provider"
+	"github.com/nfvcsd/terraform-provider-iboss/internal/provider"
 )
 
 // version is set by the release build (-ldflags "-X main.version=…").
