@@ -19,7 +19,7 @@ func main() {
 	flag.Parse()
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		// Private distribution address; see docs/releasing.md before publishing anywhere.
+		// Published on the public Terraform Registry as nfvcsd/iboss; see RELEASING.md.
 		Address:         "registry.terraform.io/nfvcsd/iboss",
 		Debug:           debug,
 		ProtocolVersion: 6,
