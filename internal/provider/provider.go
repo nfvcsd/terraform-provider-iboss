@@ -186,5 +186,6 @@ func (p *ibossProvider) DataSources(context.Context) []func() datasource.DataSou
 		NewBlocklistDataSource,
 		NewAllowlistSettingsDataSource,
 		NewSecurityGroupDataSource,
+		NewSecurityGroupsDataSource,
 	}
 }

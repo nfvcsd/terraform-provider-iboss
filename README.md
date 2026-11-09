@@ -14,6 +14,9 @@ Maintained privately by North Fayette Valley CSD. Not affiliated with or endorse
 | `iboss_allowlist`, `iboss_blocklist` | data sources | All entries on a group's list |
 | `iboss_allowlist_settings` | data source | A group's allowlist settings (read-only) |
 | `iboss_security_group` | data source | Find a group number by name |
+| `iboss_security_groups` | data source | List every security group |
+
+To keep block lists as YAML in git, start from [`examples/blocklist-sync`](examples/blocklist-sync/README.md).
 
 The provider covers a small slice of the API. [`docs/api-coverage.md`](docs/api-coverage.md) maps every
 in-scope operation, records what is planned or not mapped, and lists open questions about the API.

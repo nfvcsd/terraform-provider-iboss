@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -296,5 +297,99 @@ func (d *securityGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 	m.ParentGroupNumber = int64Value(g.ParentGroupNumber)
 	m.ReportingGroupNumber = int64Value(g.ReportingGroupNumber)
 	m.Reserved = boolValue(g.ReservedGroup)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
+}
+
+// ---- iboss_security_groups ----
+
+type securityGroupItem struct {
+	GroupNumber          types.Int64  `tfsdk:"group_number"`
+	Name                 types.String `tfsdk:"name"`
+	Note                 types.String `tfsdk:"note"`
+	Priority             types.Int64  `tfsdk:"priority"`
+	ParentGroupNumber    types.Int64  `tfsdk:"parent_group_number"`
+	ReportingGroupNumber types.Int64  `tfsdk:"reporting_group_number"`
+	Reserved             types.Bool   `tfsdk:"reserved"`
+}
+
+type securityGroupsModel struct {
+	ID     types.String        `tfsdk:"id"`
+	Groups []securityGroupItem `tfsdk:"groups"`
+}
+
+type securityGroupsDataSource struct{ c *client.Client }
+
+// NewSecurityGroupsDataSource lists every security (filtering) group.
+func NewSecurityGroupsDataSource() datasource.DataSource { return &securityGroupsDataSource{} }
+
+func (d *securityGroupsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_security_groups"
+}
+
+func (d *securityGroupsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Lists every security (filtering) group in the account, sorted by group number. " +
+			"Useful for exporting per-group policy, such as block lists, to files.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{Computed: true, MarkdownDescription: "The account settings ID the groups belong to."},
+			"groups": schema.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Security groups, sorted by `group_number`.",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"group_number":           schema.Int64Attribute{Computed: true, MarkdownDescription: "Group number (`groupNumber`)."},
+					"name":                   schema.StringAttribute{Computed: true, MarkdownDescription: "Group name (`groupName`)."},
+					"note":                   schema.StringAttribute{Computed: true, MarkdownDescription: "Group note (`note`)."},
+					"priority":               schema.Int64Attribute{Computed: true, MarkdownDescription: "Group priority (`priority`)."},
+					"parent_group_number":    schema.Int64Attribute{Computed: true, MarkdownDescription: "Parent group number (`parentGroupNumber`)."},
+					"reporting_group_number": schema.Int64Attribute{Computed: true, MarkdownDescription: "Reporting group number (`reportingGroupNumber`)."},
+					"reserved":               schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether the group is reserved (`reservedGroup`)."},
+				}},
+			},
+		},
+	}
+}
+
+func (d *securityGroupsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if c := configureDS(req, resp); c != nil {
+		d.c = c
+	}
+}
+
+func (d *securityGroupsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
+	groups, err := d.c.ListSecurityGroups(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read security groups", err.Error())
+		return
+	}
+	acct, err := d.c.AccountSettingsID(ctx)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to determine account", err.Error())
+		return
+	}
+	seen := map[int64]bool{}
+	m := securityGroupsModel{ID: types.StringValue(strconv.FormatInt(acct, 10)), Groups: []securityGroupItem{}}
+	for _, g := range groups {
+		if !g.GroupNumber.Valid {
+			resp.Diagnostics.AddError("Unexpected security group", fmt.Sprintf("group %q has no group number", g.GroupName))
+			return
+		}
+		if seen[g.GroupNumber.Int64] {
+			resp.Diagnostics.AddError("Unexpected security groups", fmt.Sprintf("group number %d appears more than once", g.GroupNumber.Int64))
+			return
+		}
+		seen[g.GroupNumber.Int64] = true
+		m.Groups = append(m.Groups, securityGroupItem{
+			GroupNumber:          int64Value(g.GroupNumber),
+			Name:                 types.StringValue(g.GroupName),
+			Note:                 types.StringValue(g.Note),
+			Priority:             int64Value(g.Priority),
+			ParentGroupNumber:    int64Value(g.ParentGroupNumber),
+			ReportingGroupNumber: int64Value(g.ReportingGroupNumber),
+			Reserved:             boolValue(g.ReservedGroup),
+		})
+	}
+	sort.Slice(m.Groups, func(i, j int) bool {
+		return m.Groups[i].GroupNumber.ValueInt64() < m.Groups[j].GroupNumber.ValueInt64()
+	})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
