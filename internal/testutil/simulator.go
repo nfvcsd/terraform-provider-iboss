@@ -148,10 +148,23 @@ func newSimulatorWithCleanup(t testing.TB, cleanup func(func())) *Simulator {
 	return s
 }
 
+// SimCluster returns a node cluster in the documented clusters-response shape.
+func SimCluster(id int64, family, host string, isDefault bool) map[string]any {
+	c := simCluster(family, host)
+	c["clusterId"] = id
+	c["defaultCluster"] = 0
+	if isDefault {
+		c["defaultCluster"] = 1
+	}
+	return c
+}
+
 func simCluster(family, host string) map[string]any {
 	return map[string]any{
-		"productFamily": family,
-		"clusterType":   "multivalue",
+		"clusterName":    "node-cluster",
+		"defaultCluster": 1,
+		"productFamily":  family,
+		"clusterType":    "multivalue",
 		"members": []any{
 			map[string]any{"primary": 1, "cloudNode": map[string]any{"masterAdminInterfaceDns": host}},
 		},

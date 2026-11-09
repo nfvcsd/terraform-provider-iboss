@@ -6,6 +6,9 @@
 
 - Legacy login used `accounts.ibosscloud.com`, which the iboss documentation names but which does not exist in
   DNS. The default is now `accounts.iboss.com`.
+- Gateway discovery failed for accounts with more than one web gateway (`swg`) cluster. It now uses the cluster
+  flagged `defaultCluster`, as the documentation describes, and otherwise lists the candidate hosts for
+  `gateway_host`.
 
 ### Added
 

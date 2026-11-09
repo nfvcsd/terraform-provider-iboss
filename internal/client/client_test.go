@@ -628,3 +628,49 @@ func TestLegacyLoginDefaultsToAccountsIbossCom(t *testing.T) {
 		t.Errorf("DefaultAccountsHost = %q", client.DefaultAccountsHost)
 	}
 }
+
+func TestDiscoveryPrefersDefaultSWGCluster(t *testing.T) {
+	sim, c := newSim(t)
+	sim.Clusters = []map[string]any{
+		testutil.SimCluster(1, "swg", "secondary"+testutil.HostSuffix, false),
+		testutil.SimCluster(2, "reports", "reporting"+testutil.HostSuffix, true),
+		testutil.SimCluster(3, "swg", testutil.GatewayHost, true),
+	}
+	if gw, err := c.GatewayHost(context.Background()); err != nil || gw != testutil.GatewayHost {
+		t.Fatalf("gateway = %q, %v; want the default swg cluster's primary", gw, err)
+	}
+}
+
+func TestDiscoveryWithoutDefaultFlagUsesOnlySWGCluster(t *testing.T) {
+	sim, c := newSim(t)
+	cl := testutil.SimCluster(3, "swg", testutil.GatewayHost, false)
+	delete(cl, "defaultCluster")
+	sim.Clusters = []map[string]any{cl}
+	if gw, err := c.GatewayHost(context.Background()); err != nil || gw != testutil.GatewayHost {
+		t.Fatalf("gateway = %q, %v", gw, err)
+	}
+}
+
+func TestDiscoveryAmbiguityNamesCandidateHosts(t *testing.T) {
+	cases := map[string][]map[string]any{
+		"two default clusters": {
+			testutil.SimCluster(1, "swg", "a"+testutil.HostSuffix, true),
+			testutil.SimCluster(2, "swg", "b"+testutil.HostSuffix, true),
+		},
+		"no default flag on either": {
+			testutil.SimCluster(1, "swg", "a"+testutil.HostSuffix, false),
+			testutil.SimCluster(2, "swg", "b"+testutil.HostSuffix, false),
+		},
+	}
+	for name, clusters := range cases {
+		t.Run(name, func(t *testing.T) {
+			sim, c := newSim(t)
+			sim.Clusters = clusters
+			_, err := c.GatewayHost(context.Background())
+			if err == nil || !strings.Contains(err.Error(), "a"+testutil.HostSuffix+` (cluster "node-cluster" (id 1))`) ||
+				!strings.Contains(err.Error(), "b"+testutil.HostSuffix) || !strings.Contains(err.Error(), "IBOSS_GATEWAY_HOST") {
+				t.Fatalf("err = %v", err)
+			}
+		})
+	}
+}
