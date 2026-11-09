@@ -28,6 +28,7 @@ const (
 	EnvTOTPCode          = "IBOSS_TOTP_CODE"
 	EnvAccountSettingsID = "IBOSS_ACCOUNT_SETTINGS_ID"
 	EnvGatewayHost       = "IBOSS_GATEWAY_HOST"
+	EnvAccountsHost      = "IBOSS_ACCOUNTS_HOST"
 )
 
 var _ provider.Provider = (*ibossProvider)(nil)
@@ -64,6 +65,7 @@ type providerModel struct {
 	TOTPCode          types.String `tfsdk:"totp_code"`
 	AccountSettingsID types.Int64  `tfsdk:"account_settings_id"`
 	GatewayHost       types.String `tfsdk:"gateway_host"`
+	AccountsHost      types.String `tfsdk:"accounts_host"`
 }
 
 func (p *ibossProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -101,6 +103,11 @@ func (p *ibossProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 				Optional:            true,
 				Validators:          []validator.Int64{int64validator.AtLeast(1)},
 			},
+			"accounts_host": schema.StringAttribute{
+				MarkdownDescription: "Host name used for legacy username/password login. Defaults to `" + client.DefaultAccountsHost + "`. " +
+					"Only needed if iboss directs you to a different login host. Falls back to `" + EnvAccountsHost + "`.",
+				Optional: true,
+			},
 			"gateway_host": schema.StringAttribute{
 				MarkdownDescription: "Host name of the primary gateway node (for example `cn-0000.ibosscloud.com`). When omitted, it is discovered from the account's node clusters. Falls back to `" + EnvGatewayHost + "`.",
 				Optional:            true,
@@ -119,6 +126,7 @@ func (p *ibossProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		"api_key": cfg.APIKey.IsUnknown(), "username": cfg.Username.IsUnknown(),
 		"password": cfg.Password.IsUnknown(), "totp_code": cfg.TOTPCode.IsUnknown(),
 		"account_settings_id": cfg.AccountSettingsID.IsUnknown(), "gateway_host": cfg.GatewayHost.IsUnknown(),
+		"accounts_host": cfg.AccountsHost.IsUnknown(),
 	}
 	for name, u := range unknown {
 		if u {
@@ -159,6 +167,12 @@ func (p *ibossProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		cc.GatewayHost = cfg.GatewayHost.ValueString()
 	} else {
 		cc.GatewayHost = strings.TrimSpace(os.Getenv(EnvGatewayHost))
+	}
+
+	if !cfg.AccountsHost.IsNull() {
+		cc.AccountsHost = cfg.AccountsHost.ValueString()
+	} else {
+		cc.AccountsHost = strings.TrimSpace(os.Getenv(EnvAccountsHost))
 	}
 
 	if p.configHook != nil {

@@ -21,10 +21,16 @@ import (
 	"time"
 )
 
-// Documented fixed hosts (Postman introduction, "API Endpoint Host").
+// Fixed hosts. The core host is documented (Postman introduction, "API
+// Endpoint Host"). The introduction also names "accounts.ibosscloud.com" for
+// authentication, but that name does not exist in public DNS (checked
+// 2026-11-09); the login request itself uses the unpublished {{ibossAccounts}}
+// variable. "accounts.iboss.com" resolves into the same iboss address block
+// as api.ibosscloud.com and is used instead. Override with Config.AccountsHost
+// (provider argument accounts_host). See docs/api-coverage.md, Q13.
 const (
 	DefaultCoreHost     = "api.ibosscloud.com"
-	DefaultAccountsHost = "accounts.ibosscloud.com"
+	DefaultAccountsHost = "accounts.iboss.com"
 
 	// DefaultUserAgent is the User-Agent value sent by every documented request.
 	DefaultUserAgent = "ibossAPI"

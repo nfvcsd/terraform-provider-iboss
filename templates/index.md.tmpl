@@ -35,8 +35,8 @@ automatically; prefer an API key for unattended runs.
 
 ### What the provider does on first use
 
-1. API key: sends `Authorization: Token <key>`. Legacy: calls `accounts.ibosscloud.com` with HTTP Basic
-   authentication to obtain a session token.
+1. API key: sends `Authorization: Token <key>`. Legacy: calls `accounts.iboss.com` (or `accounts_host`) with
+   HTTP Basic authentication to obtain a session token.
 2. Calls `api.ibosscloud.com` to find the account (the primary account unless `account_settings_id` is set)
    and to obtain the session cookies the gateway API expects.
 3. Unless `gateway_host` is set, discovers the primary gateway node from the account's node clusters. A

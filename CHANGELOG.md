@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Legacy login used `accounts.ibosscloud.com`, which the iboss documentation names but which does not exist in
+  DNS. The default is now `accounts.iboss.com`.
+
 ### Added
+
+- `accounts_host` provider argument (`IBOSS_ACCOUNTS_HOST`) to override the legacy login host.
 
 - `iboss_security_groups` data source listing every security group.
 - `examples/blocklist-sync`: sync every group's block list to
