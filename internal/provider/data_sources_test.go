@@ -207,3 +207,40 @@ func TestAccProvider_invalidEnvAccount(t *testing.T) {
 		}},
 	})
 }
+
+func TestAccSecurityGroupsList(t *testing.T) {
+	sim := newAcc(t)
+	// Out of order on purpose: the data source sorts by group number.
+	sim.Groups = []map[string]any{
+		{"groupNumber": 32, "groupName": "NFVMBL_HS", "reservedGroup": 1, "note": "high school"},
+		{"groupNumber": 10, "groupName": "NFVMBL_ValElem", "reservedGroup": 1},
+		{"groupNumber": "20", "groupName": "NFVMBL_Staff", "reservedGroup": 0},
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config: providerAPIKey + `data "iboss_security_groups" "all" {}`,
+			Check: resource.ComposeAggregateTestCheckFunc(
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "id", "100001"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.#", "3"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.0.group_number", "10"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.1.name", "NFVMBL_Staff"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.2.name", "NFVMBL_HS"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.2.note", "high school"),
+				resource.TestCheckResourceAttr("data.iboss_security_groups.all", "groups.2.reserved", "true"),
+			),
+		}},
+	})
+}
+
+func TestAccSecurityGroupsListRejectsDuplicateNumbers(t *testing.T) {
+	sim := newAcc(t)
+	sim.Groups = []map[string]any{{"groupNumber": 5, "groupName": "A"}, {"groupNumber": 5, "groupName": "B"}}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories(sim),
+		Steps: []resource.TestStep{{
+			Config:      providerAPIKey + `data "iboss_security_groups" "all" {}`,
+			ExpectError: regexp.MustCompile(`appears more than once`),
+		}},
+	})
+}

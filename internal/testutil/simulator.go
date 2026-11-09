@@ -210,6 +210,19 @@ func (s *Simulator) FailNext(method, path string, status, n int, header map[stri
 	s.failures = append(s.failures, &failure{method: method, path: path, status: status, header: header, remaining: n, body: `{"message":"simulated failure"}`})
 }
 
+// RenameGroup changes a security group's name (simulating a console edit).
+func (s *Simulator) RenameGroup(number int64, name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, g := range s.Groups {
+		if fmt.Sprint(g["groupNumber"]) == strconv.FormatInt(number, 10) {
+			g["groupName"] = name
+			return true
+		}
+	}
+	return false
+}
+
 // FailNextWithBody is FailNext with a custom response body.
 func (s *Simulator) FailNextWithBody(method, path string, status int, body string) {
 	s.mu.Lock()

@@ -79,7 +79,7 @@ func TestTypeNames(t *testing.T) {
 	p := provider.New("test")()
 	want := map[string]bool{
 		"iboss_allowlist_entry": true, "iboss_blocklist_entry": true,
-		"iboss_allowlist": true, "iboss_blocklist": true, "iboss_allowlist_settings": true, "iboss_security_group": true,
+		"iboss_allowlist": true, "iboss_blocklist": true, "iboss_allowlist_settings": true, "iboss_security_group": true, "iboss_security_groups": true,
 	}
 	for _, f := range p.Resources(ctx) {
 		var md resource.MetadataResponse
